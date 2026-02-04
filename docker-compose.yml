@@ -1,13 +1,20 @@
 services:
 
   minha-receita:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile
     ports:
       - 8000:8000
     env_file:
       - .env
     volumes:
       - ./data:/mnt/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mongo:
+        condition: service_healthy
 
   postgres:
     image: postgres:16.1-bookworm
@@ -42,6 +49,11 @@ services:
       - ./data/mongodb:/data/db
     ports:
       - "27017:27017"
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   mongo_test:
     image: mongo:8.0-noble

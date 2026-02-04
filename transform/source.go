@@ -28,6 +28,11 @@ func pathsForSource(t sourceType, dir string) ([]string, error) {
 		}
 	}
 	if len(ls) == 0 {
+		// Tax regime files are optional (may not be available in new infrastructure)
+		if t == realProfit || t == presumedProfit || t == arbitratedProfit || t == noTaxes {
+			slog.Warn("tax regime file not found (continuing without it)", "source", string(t), "directory", dir)
+			return []string{}, nil
+		}
 		return []string{}, fmt.Errorf("could not find any file matching %s in %s", string(t), dir)
 	}
 	return ls, nil
@@ -67,6 +72,10 @@ type source struct {
 }
 
 func (s *source) createReaders() error {
+	// Skip if no files (optional source not available)
+	if len(s.files) == 0 {
+		return nil
+	}
 	s.readers = make([]*archivedCSVs, len(s.files))
 	for i, p := range s.files {
 		var h bool
@@ -98,6 +107,10 @@ func (s *source) createReaders() error {
 }
 
 func (s *source) close() error {
+	// Skip if no files (optional source not available)
+	if len(s.files) == 0 {
+		return nil
+	}
 	for _, r := range s.readers {
 		if err := r.close(); err != nil {
 			return fmt.Errorf("error closing %s: %w", r.path, err)
@@ -107,6 +120,10 @@ func (s *source) close() error {
 }
 
 func (s *source) resetReaders() error {
+	// Skip if no files (optional source not available)
+	if len(s.files) == 0 {
+		return nil
+	}
 	if err := s.close(); err != nil {
 		return fmt.Errorf("error closing readers: %w", err)
 	}
@@ -132,6 +149,11 @@ func (s *source) countCSVRows(a *archivedCSVs, count chan<- int64, errs chan<- e
 }
 
 func (s *source) countLines() error {
+	// Skip if no files (optional source not available)
+	if len(s.files) == 0 {
+		s.total = 0
+		return nil
+	}
 	count := make(chan int64)
 	errs := make(chan error)
 	for _, r := range s.readers {
@@ -160,6 +182,10 @@ func (s *source) countLines() error {
 }
 
 func (s *source) sendTo(ctx context.Context, ch chan<- []string) error {
+	// Skip if no files (optional source not available)
+	if len(s.files) == 0 {
+		return nil
+	}
 	g, ctx := errgroup.WithContext(ctx)
 	for _, r := range s.readers {
 		a := r
@@ -184,6 +210,14 @@ func newSource(ctx context.Context, t sourceType, d string) (*source, error) {
 		if err != nil {
 			if !done.Load() {
 				ch <- fmt.Errorf("error getting files for %s in %s: %w", string(t), d, err)
+			}
+			return
+		}
+		// If no files found but it's an optional source, return empty source
+		if len(ls) == 0 {
+			s = source{kind: t, dir: d, files: []string{}, total: 0}
+			if !done.Load() {
+				ch <- nil
 			}
 			return
 		}

@@ -63,7 +63,7 @@ func Download(dir string, timeout time.Duration, skip, restart bool, parallel in
 		return fmt.Errorf("error downloading files from the national treasure: %w", err)
 	}
 	slog.Info("Downloading files from the Federal Revenue…")
-	urls, err := getURLs(federalRevenueURL, federalRevenueGetURLs, dir, skip)
+	urls, err := getURLs(FederalRevenueBaseURL, federalRevenueGetURLs, dir, skip)
 	if err != nil {
 		return fmt.Errorf("error gathering resources for download: %w", err)
 	}
@@ -81,7 +81,7 @@ func Download(dir string, timeout time.Duration, skip, restart bool, parallel in
 
 // URLs shows the URLs to be downloaded.
 func URLs(dir string, skip bool) error {
-	urls := []string{federalRevenueURL, nationalTreasureBaseURL}
+	urls := []string{FederalRevenueBaseURL, nationalTreasureBaseURL}
 	handlers := []getURLsHandler{federalRevenueGetURLs, nationalTreasureGetURLs}
 	var out []string
 	for idx := range urls {
