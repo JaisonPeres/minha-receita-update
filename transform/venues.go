@@ -11,13 +11,14 @@ import (
 )
 
 type venuesTask struct {
-	source    *source
-	lookups   *lookups
-	kv        kvStorage
-	privacy   bool
-	dir       string
-	db        database
-	batchSize int
+	source     *source
+	lookups    *lookups
+	kv         kvStorage
+	privacy    bool
+	dir        string
+	db         database
+	batchSize  int
+	maxRecords int
 }
 
 func (t *venuesTask) saveBatch(b []Company) (int, error) {
@@ -44,6 +45,7 @@ func (t *venuesTask) consumeRows(ctx context.Context, q <-chan []string, done ch
 	defer close(errs)
 	go func() {
 		var b []Company
+		var totalProcessed int
 		for {
 			select {
 			case <-ctx.Done():
@@ -58,12 +60,29 @@ func (t *venuesTask) consumeRows(ctx context.Context, q <-chan []string, done ch
 					ch <- n
 					return
 				}
+				// Check if we've reached the max records limit
+				if t.maxRecords > 0 && totalProcessed >= t.maxRecords {
+					continue // Skip remaining records
+				}
 				c, err := newCompany(r, t.lookups, t.kv, t.privacy)
 				if err != nil {
 					errs <- fmt.Errorf("error parsing company from %q: %w", r, err)
 					return
 				}
 				b = append(b, c)
+				totalProcessed++
+				// Check if we've reached the limit after adding this record
+				if t.maxRecords > 0 && totalProcessed >= t.maxRecords {
+					// Save current batch and stop
+					n, err := t.saveBatch(b)
+					if err != nil {
+						errs <- err
+						return
+					}
+					ch <- n
+					slog.Info("Reached maximum records limit", "max", t.maxRecords)
+					return
+				}
 				if len(b) < t.batchSize {
 					continue
 				}
@@ -95,8 +114,17 @@ func (t *venuesTask) consumeRows(ctx context.Context, q <-chan []string, done ch
 }
 
 func (t *venuesTask) run(m int) error {
-	bar := progressbar.Default(int64(t.source.total))
-	bar.Describe("Creating the JSON data for each CNPJ")
+	// Use maxRecords for progress bar if set, otherwise use source total
+	total := t.source.total
+	if t.maxRecords > 0 && int64(t.maxRecords) < total {
+		total = int64(t.maxRecords)
+	}
+	bar := progressbar.Default(total)
+	if t.maxRecords > 0 {
+		bar.Describe(fmt.Sprintf("Creating the JSON data for each CNPJ (limited to %d records)", t.maxRecords))
+	} else {
+		bar.Describe("Creating the JSON data for each CNPJ")
+	}
 	defer func() {
 		if err := t.source.close(); err != nil {
 			slog.Warn("could not close source files", "error", err)
@@ -133,6 +161,7 @@ func (t *venuesTask) run(m int) error {
 			errs <- err
 		}
 	}()
+	var processedRecords int64
 	for {
 		select {
 		case err := <-errs:
@@ -141,6 +170,13 @@ func (t *venuesTask) run(m int) error {
 			if err := bar.Add(n); err != nil {
 				return err
 			}
+			processedRecords += int64(n)
+			// Stop when we've reached the max limit
+			if t.maxRecords > 0 && processedRecords >= int64(t.maxRecords) {
+				cancel() // Cancel context to stop workers
+				slog.Info("Reached maximum records limit", "max", t.maxRecords, "processed", processedRecords)
+				return nil
+			}
 			if bar.IsFinished() {
 				return nil
 			}
@@ -148,19 +184,20 @@ func (t *venuesTask) run(m int) error {
 	}
 }
 
-func createJSONRecordsTask(dir string, db database, l *lookups, kv kvStorage, b int, p bool) (*venuesTask, error) {
+func createJSONRecordsTask(dir string, db database, l *lookups, kv kvStorage, b int, p bool, maxRecords int) (*venuesTask, error) {
 	v, err := newSource(context.Background(), venues, dir)
 	if err != nil {
 		return nil, fmt.Errorf("error creating a source for venues from %s: %w", dir, err)
 	}
 	t := venuesTask{
-		source:    v,
-		lookups:   l,
-		kv:        kv,
-		privacy:   p,
-		dir:       dir,
-		db:        db,
-		batchSize: b,
+		source:     v,
+		lookups:    l,
+		kv:         kv,
+		privacy:    p,
+		dir:        dir,
+		db:         db,
+		batchSize:  b,
+		maxRecords: maxRecords,
 	}
 	return &t, nil
 }

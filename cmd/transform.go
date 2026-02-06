@@ -23,6 +23,7 @@ var (
 	batchSize            int
 	cleanUp              bool
 	noPrivacy            bool
+	maxRecords           int
 )
 
 var transformCmd = &cobra.Command{
@@ -48,7 +49,7 @@ var transformCmd = &cobra.Command{
 				return err
 			}
 		}
-		return transform.Transform(dir, db, maxParallelDBQueries, maxParallelKVWrites, batchSize, !noPrivacy)
+		return transform.Transform(dir, db, maxParallelDBQueries, maxParallelKVWrites, batchSize, !noPrivacy, maxRecords)
 	},
 }
 
@@ -72,5 +73,6 @@ func transformCLI() *cobra.Command {
 	transformCmd.Flags().IntVarP(&batchSize, "batch-size", "b", transform.BatchSize, "size of the batch to save to the database")
 	transformCmd.Flags().BoolVarP(&cleanUp, "clean-up", "c", cleanUp, "drop & recreate the database table before starting")
 	transformCmd.Flags().BoolVarP(&noPrivacy, "no-privacy", "p", noPrivacy, "include email addresses, CPF and other PII in the JSON data")
+	transformCmd.Flags().IntVarP(&maxRecords, "max-records", "l", 0, "maximum number of company records to save (0 = unlimited, useful for testing with limited disk space)")
 	return transformCmd
 }

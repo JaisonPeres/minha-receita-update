@@ -50,4 +50,6 @@ In February 2026, the Brazilian Federal Revenue migrated their data infrastructu
 
 For the original upstream project, visit: [https://codeberg.org/cuducos/minha-receita](https://codeberg.org/cuducos/minha-receita)
 
+**📦 Limited Disk Space?** See [docs/limited-space.md](docs/limited-space.md) for configuration options.
+
 ---
