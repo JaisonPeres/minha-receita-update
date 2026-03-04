@@ -6,14 +6,22 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/cuducos/go-cnpj"
+	"codeberg.org/cuducos/minha-receita/pkg/cnpjcanonical"
 	"github.com/dgraph-io/badger/v4"
 )
 
-func keyForPartners(n string) string    { return fmt.Sprintf("p-%s", n) }
-func keyForBase(n string) string        { return fmt.Sprintf("b-%s", n) }
-func keyForSimpleTaxes(n string) string { return fmt.Sprintf("st-%s", n) }
-func keyForTaxRegime(n string) string   { return fmt.Sprintf("tr-%s", cnpj.Unmask(n)) }
+func canonicalKey(n string) string {
+	can, err := cnpjcanonical.NormalizeCNPJCanonical(n)
+	if err != nil {
+		return n
+	}
+	return can
+}
+
+func keyForPartners(n string) string    { return fmt.Sprintf("p-%s", canonicalKey(n)) }
+func keyForBase(n string) string        { return fmt.Sprintf("b-%s", canonicalKey(n)) }
+func keyForSimpleTaxes(n string) string { return fmt.Sprintf("st-%s", canonicalKey(n)) }
+func keyForTaxRegime(n string) string   { return fmt.Sprintf("tr-%s", canonicalKey(n)) }
 
 func baseOf(db *badger.DB, n string) (baseData, error) {
 	var d baseData

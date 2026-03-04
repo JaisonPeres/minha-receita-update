@@ -39,6 +39,9 @@ func (t *venuesTask) saveBatch(b []Company) (int, error) {
 	return len(s), nil
 }
 
+// logProgressInterval is how often to log progress (every N records) from the main loop
+const logProgressInterval = 10000
+
 func (t *venuesTask) consumeRows(ctx context.Context, q <-chan []string, done chan<- int) error {
 	ch := make(chan int)
 	errs := make(chan error, 1)
@@ -162,15 +165,23 @@ func (t *venuesTask) run(m int) error {
 		}
 	}()
 	var processedRecords int64
+	var firstBatchLogged bool
 	for {
 		select {
 		case err := <-errs:
 			return err
 		case n := <-ch:
+			if !firstBatchLogged && n > 0 {
+				slog.Info("First batch saved, processing started", "count", n)
+				firstBatchLogged = true
+			}
 			if err := bar.Add(n); err != nil {
 				return err
 			}
 			processedRecords += int64(n)
+			if processedRecords > 0 && processedRecords%logProgressInterval == 0 {
+				slog.Info("Processing progress", "processed", processedRecords, "total", total)
+			}
 			// Stop when we've reached the max limit
 			if t.maxRecords > 0 && processedRecords >= int64(t.maxRecords) {
 				cancel() // Cancel context to stop workers
@@ -189,6 +200,16 @@ func createJSONRecordsTask(dir string, db database, l *lookups, kv kvStorage, b 
 	if err != nil {
 		return nil, fmt.Errorf("error creating a source for venues from %s: %w", dir, err)
 	}
+	batchSize := b
+	if maxRecords > 0 {
+		if batchSize > 500 {
+			batchSize = 500
+		}
+		if maxRecords < 5000 && batchSize > 100 {
+			batchSize = 100
+		}
+		slog.Info("Using smaller batch size for progress visibility", "batch_size", batchSize, "max_records", maxRecords)
+	}
 	t := venuesTask{
 		source:     v,
 		lookups:    l,
@@ -196,7 +217,7 @@ func createJSONRecordsTask(dir string, db database, l *lookups, kv kvStorage, b 
 		privacy:    p,
 		dir:        dir,
 		db:         db,
-		batchSize:  b,
+		batchSize:  batchSize,
 		maxRecords: maxRecords,
 	}
 	return &t, nil

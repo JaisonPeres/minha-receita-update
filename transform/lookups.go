@@ -86,6 +86,7 @@ func newLookups(d string) (lookups, error) {
 		678: "Saint Kitts e Nevis",
 		699: "Sint Maarten",
 		737: "Sérvia",
+		755: "A Designar", // Receita Federal - código não presente em Paises.zip
 		994: "A Designar",
 	} {
 		if _, ok := ls[2][k]; !ok {

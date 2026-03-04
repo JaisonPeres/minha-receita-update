@@ -13,8 +13,6 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      mongo:
-        condition: service_healthy
 
   postgres:
     image: postgres:16.1-bookworm
@@ -39,27 +37,31 @@ services:
     environment: *credentials
     command: ["postgres", "-c", "log_statement=all"]
 
-  mongo:
-    image: mongo:8.0-noble
-    restart: always
-    environment:
-      MONGO_INITDB_ROOT_USERNAME: minhareceita
-      MONGO_INITDB_ROOT_PASSWORD: minhareceita
-    volumes:
-      - ./data/mongodb:/data/db
-    ports:
-      - "27017:27017"
-    healthcheck:
-      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+  # MongoDB services (optional - only needed if you choose to use MongoDB instead of PostgreSQL)
+  # To use MongoDB, change DATABASE_URL in .env to mongodb://minhareceita:minhareceita@mongo:27017/minhareceita?authSource=admin
+  # and add mongo back to depends_on in minha-receita service above
 
-  mongo_test:
-    image: mongo:8.0-noble
-    restart: always
-    environment:
-      MONGO_INITDB_ROOT_USERNAME: minhareceita
-      MONGO_INITDB_ROOT_PASSWORD: minhareceita
-    ports:
-      - "27117:27017"
+  # mongo:
+  #   image: mongo:8.0-noble
+  #   restart: always
+  #   environment:
+  #     MONGO_INITDB_ROOT_USERNAME: minhareceita
+  #     MONGO_INITDB_ROOT_PASSWORD: minhareceita
+  #   volumes:
+  #     - ./data/mongodb:/data/db
+  #   ports:
+  #     - "27017:27017"
+  #   healthcheck:
+  #     test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+  #     interval: 10s
+  #     timeout: 5s
+  #     retries: 5
+
+  # mongo_test:
+  #   image: mongo:8.0-noble
+  #   restart: always
+  #   environment:
+  #     MONGO_INITDB_ROOT_USERNAME: minhareceita
+  #     MONGO_INITDB_ROOT_PASSWORD: minhareceita
+  #   ports:
+  #     - "27117:27017"

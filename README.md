@@ -52,4 +52,6 @@ For the original upstream project, visit: [https://codeberg.org/cuducos/minha-re
 
 **📦 Limited Disk Space?** See [docs/limited-space.md](docs/limited-space.md) for configuration options.
 
+**🇧🇷 Documentação em Português:** [CUSTOMIZAÇÕES.md](CUSTOMIZAÇÕES.md) - Resumo completo de todas as customizações
+
 ---

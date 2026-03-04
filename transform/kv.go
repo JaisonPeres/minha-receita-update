@@ -11,7 +11,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cuducos/go-cnpj"
 	"github.com/dgraph-io/badger/v4"
 	"github.com/schollz/progressbar/v3"
 	"golang.org/x/sync/errgroup"
@@ -172,7 +171,7 @@ func (kv *badgerStorage) load(dir string, l *lookups, m int) error {
 }
 
 func (kv *badgerStorage) enrichCompany(c *Company) error {
-	n := cnpj.Base(c.CNPJ)
+	n := canonicalKey(c.CNPJ)
 	ps := make(chan []PartnerData)
 	bs := make(chan baseData)
 	st := make(chan simpleTaxesData)
@@ -200,7 +199,7 @@ func (kv *badgerStorage) enrichCompany(c *Company) error {
 		st <- t
 	}()
 	go func() {
-		t, err := taxRegimeOf(kv.db, c.CNPJ)
+		t, err := taxRegimeOf(kv.db, n)
 		if err != nil {
 			errs <- err
 		}

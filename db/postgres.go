@@ -12,6 +12,7 @@ import (
 	"text/template"
 	"time"
 
+	"codeberg.org/cuducos/minha-receita/pkg/cnpjcanonical"
 	"codeberg.org/cuducos/minha-receita/transform"
 	"github.com/huandu/go-sqlbuilder"
 	"github.com/jackc/pgx/v5"
@@ -150,11 +151,16 @@ func (p *PostgreSQL) Drop() error {
 
 // CreateCompanies performs a copy to create a batch of companies in the
 // database. It expects an array and each item should be another array with only
-// two items: the ID and the JSON field values.
+// two items: the ID and the JSON field values. The ID is normalized to canonical
+// form (14 chars [0-9A-Z]) for alphanumeric CNPJ support (2026+).
 func (p *PostgreSQL) CreateCompanies(batch [][]string) error {
 	b := make([][]any, len(batch))
 	for i, r := range batch {
-		b[i] = []any{r[0], r[1]}
+		id, err := cnpjcanonical.NormalizeCNPJCanonical(r[0])
+		if err != nil {
+			return fmt.Errorf("invalid CNPJ id %q at row %d: %w", r[0], i, err)
+		}
+		b[i] = []any{id, r[1]}
 	}
 	_, err := p.pool.CopyFrom(
 		context.Background(),
